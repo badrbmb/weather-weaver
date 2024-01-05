@@ -49,15 +49,15 @@ class ECMWFOpenDataRequest(BaseRequest):
     @property
     def file_name(self) -> str:
         """File name based on request parameters."""
-        return "_".join(
+        _name = "_".join(
             [
                 self.run_date.strftime("%Y%m%d"),
                 f"{str(self.run_time.value).zfill(2)}z",
                 f"{self.forecast_steps[0]}-{self.forecast_steps[-1]}",
-                self.stream.value,
                 self.request_type.value,
             ],
         )
+        return f"{self.stream.value}/{_name}"
 
     def to_ecmwf_request(self) -> dict[str, Any]:
         """Create request compatible with ECMWF."""
@@ -119,14 +119,13 @@ class ECMWFOpenDataFetcher(FetcherInterface):
     def download_raw_files(
         self,
         request: ECMWFOpenDataRequest,
+        update: bool = False,
     ) -> Path | None:
         """Wrapper around ECMWF open data client."""
-        tmp_folder = self.data_dir / request.stream.value
-        tmp_folder.mkdir(exist_ok=True)
+        destination_path = self.data_dir / f"{request.file_name}.grib2"
+        destination_path.parent.mkdir(parents=True, exist_ok=True)
 
-        destination_path = tmp_folder / f"{request.file_name}.grib2"
-
-        if destination_path.exists():
+        if destination_path.exists() and not update:
             logger.debug(
                 event="Download raw files skipped.",
                 fetcher=self.__class__.__name__,

@@ -9,7 +9,11 @@ from weather_weaver.models.request import BaseRequest
 class StorageInterface(Protocol):
     """Generic interface for storing fetched NWP data."""
 
-    def list_files_for_request(self, *, requests: list[BaseRequest]) -> None:
+    def exists(self, *, path: Path) -> bool:
+        """Check if file exists in store."""
+        pass
+
+    def list_files_for_request(self, *, requests: list[BaseRequest]) -> list[Path]:
         """List the available files for requests."""
         pass
 
