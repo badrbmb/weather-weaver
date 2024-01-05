@@ -4,6 +4,7 @@ from typing import Any, Generator
 
 from weather_weaver.inputs.ecmwf import constants
 from weather_weaver.models.request import BaseRequest, BaseRequestBuilder
+from weather_weaver.utils import GeoFilterModel, load_world_countries
 
 
 class StreamType(Enum):
@@ -30,7 +31,12 @@ class ECMWFOpenDataRequest(BaseRequest):
     request_type: RequestType
     nwp_parameters: list[str]
     forecast_steps: list[int]
-    country_iso3s: list[str] | None = None
+    update_raw: bool = False
+    geo_filter: GeoFilterModel | None = None
+    normalise_data: bool = False
+
+    class Config:  # noqa: D106
+        arbitrary_types_allowed = True
 
     @property
     def file_name(self) -> str:
@@ -68,14 +74,19 @@ class ECMWFOpenDataRequest(BaseRequest):
 class ECMWFOpenDataRequestBuilder(BaseRequestBuilder):
     def __init__(self) -> None:
         super().__init__()
+        world = load_world_countries()
         self.default_iso3s = constants.ENTSO_E_ISO3_LIST
         self.default_nwp_parameters = constants.NWP_PARAMETERS
         self.default_forecast_steps = constants.FORECAST_STEPS
+        self.geo_filter = GeoFilterModel(
+            filter_df=world[world["country_iso3"].isin(self.default_iso3s)],
+            method="within",
+        )
 
     def build_default_requests(
         self,
         run_date: dt.date,
-    ) -> Generator[ECMWFOpenDataRequest, None, None]:
+    ) -> list[ECMWFOpenDataRequest]:
         """Return all the default requests for a given run_date.
 
         Download default variables as defined in constants.NWP_PARAMETERS,
@@ -84,6 +95,7 @@ class ECMWFOpenDataRequestBuilder(BaseRequestBuilder):
         - oper + fc @ all run times
         - ens + pfc @ all run times
         """
+        all_requests = []
         for stream, request_type in zip(
             [
                 StreamType.OPER,
@@ -95,12 +107,22 @@ class ECMWFOpenDataRequestBuilder(BaseRequestBuilder):
             ],
         ):
             for run_time in list(RunTime):
-                yield ECMWFOpenDataRequest(
-                    run_date=run_date,
-                    run_time=run_time,
-                    stream=stream,
-                    request_type=request_type,
-                    nwp_parameters=self.default_nwp_parameters,
-                    forecast_steps=self.default_forecast_steps,
-                    country_iso3s=self.default_iso3s,
+                all_requests.append(
+                    ECMWFOpenDataRequest(
+                        run_date=run_date,
+                        run_time=run_time,
+                        stream=stream,
+                        request_type=request_type,
+                        nwp_parameters=self.default_nwp_parameters,
+                        forecast_steps=self.default_forecast_steps,
+                        geo_filter=self.geo_filter,
+                    ),
                 )
+        return all_requests
+
+    def build_closest_requests(
+        self,
+        target_run_date: dt.datetime,
+    ) -> Generator[BaseRequest, None, None]:
+        """Builds the request closest to the desired target_run_date."""
+        raise NotImplementedError()

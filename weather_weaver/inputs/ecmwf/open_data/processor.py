@@ -7,7 +7,6 @@ import xarray as xr
 from weather_weaver.inputs.ecmwf import constants
 from weather_weaver.inputs.ecmwf.open_data.request import ECMWFOpenDataRequest
 from weather_weaver.models.processor import BaseProcessor
-from weather_weaver.utils import GeoFilterModel
 
 
 class EMCWFOpenDataProcessor(BaseProcessor):
@@ -83,21 +82,19 @@ class EMCWFOpenDataProcessor(BaseProcessor):
         self,
         raw_path: Path,
         request: ECMWFOpenDataRequest,
-        filter_model: GeoFilterModel | None,
-        normalise: bool = False,
     ) -> dask_gpd.GeoDataFrame:
         """Process raw file."""
         datasets = self.load(raw_path)
         dataset = self.merge_datasets(datasets)
-        if filter_model is not None:
-            dataset = filter_model.prefilter_dataset(dataset)
+        if request.geo_filter is not None:
+            dataset = request.geo_filter.prefilter_dataset(dataset)
         ddf = self.process(
             dataset=dataset,
             id_vars=request.variables,
-            normalise=normalise,
+            normalise=request.normalise_data,
         )
-        if filter_model is not None:
-            ddf = filter_model.filter_dask(ddf)
+        if request.geo_filter is not None:
+            ddf = request.geo_filter.filter_dask(ddf)
         ddf = self.post_process(ddf)
 
         return ddf

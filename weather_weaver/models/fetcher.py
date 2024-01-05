@@ -11,6 +11,6 @@ class FetcherInterface(Protocol):
         """List the relative path of all files available from source for the given run_date."""
         pass
 
-    def download_raw_files(self, *, request: BaseRequest) -> Path:
+    def download_raw_file(self, *, raw_dir: Path, request: BaseRequest) -> Path:
         """Fetch the bytes of a single raw file from source and save to local file."""
         pass

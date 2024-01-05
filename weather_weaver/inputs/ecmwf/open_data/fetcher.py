@@ -14,17 +14,14 @@ class ECMWFOpenDataFetcher(FetcherInterface):
     def __init__(
         self,
         data_source: str = constants.DATA_SOURCE,
-        data_dir: Path = constants.RAW_DIR,
     ) -> None:
         super().__init__()
         self.data_source = data_source
         self.client = ECMWFClient(source=self.data_source)
-        self.data_dir = data_dir
         logger.debug(
             event="Init fetcher",
             source="ECMWF",
             data_source=data_source,
-            data_dir=data_dir,
         )
 
     def list_raw_files(self, request: ECMWFOpenDataRequest) -> list[tuple[str, tuple[int]]] | None:
@@ -44,13 +41,14 @@ class ECMWFOpenDataFetcher(FetcherInterface):
             return None
         return results.urls
 
-    def download_raw_files(
+    def download_raw_file(
         self,
         request: ECMWFOpenDataRequest,
+        raw_dir: Path,
         update: bool = False,
     ) -> Path | None:
         """Wrapper around ECMWF open data client."""
-        destination_path = self.data_dir / f"{request.file_name}.grib2"
+        destination_path = raw_dir / f"{request.file_name}.grib2"
         destination_path.parent.mkdir(parents=True, exist_ok=True)
 
         if destination_path.exists() and not update:

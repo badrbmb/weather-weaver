@@ -14,7 +14,7 @@ class BaseRequest(ABC, BaseModel):
 
 class BaseRequestBuilder(ABC):
     @abstractmethod
-    def build_default_requests(self, run_date: dt.date) -> Generator[BaseRequest, None, None]:
+    def build_default_requests(self, run_date: dt.date) -> list[BaseRequest]:
         """Build a series of default requests compatible with a fetcher."""
         pass
 

@@ -9,7 +9,7 @@ from weather_weaver.models.storage import StorageInterface
 logger = structlog.getLogger()
 
 
-class Client(StorageInterface):
+class LocalClient(StorageInterface):
     def exists(self, *, path: Path) -> bool:
         """Check if file exists."""
         return path.exists()
