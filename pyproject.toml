@@ -31,6 +31,7 @@ ipykernel = "^6.28.0"
 mypy = "^1.8.0"
 ruff = "^0.1.9"
 rich = "^13.7.0"
+pre-commit = "^3.6.0"
 
 [tool.poetry.group.ecmwf.dependencies]
 ecmwf-opendata = "^0.2.0"
