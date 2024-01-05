@@ -1,8 +1,11 @@
 import shutil
 from pathlib import Path
 
+import dask_geopandas as dask_gpd
 import geopandas as gpd
 import requests
+import shapely
+import xarray as xr
 
 from weather_weaver.config import DATA_DIR
 
@@ -33,3 +36,29 @@ def load_world_countries(resolution: str = "110m") -> gpd.GeoDataFrame:
         inplace=True,
     )
     return world[["country_name", "country_iso3", "geometry"]].copy()
+
+
+class GeoFilterModel:
+    def __init__(self, filter_df: gpd.GeoDataFrame, method: str) -> None:
+        self.filter_df = filter_df
+        self.method = method
+
+    def prefilter_dataset(self, dataset: xr.Dataset) -> xr.Dataset:
+        """Pre-filter a dataset using longitude (the most numerous dimension)."""
+        bounds = self.bounds
+        return dataset.sel(longitude=slice(bounds["min_lon"], bounds["max_lon"]))
+
+    def filter_dask(self, ddf: dask_gpd.GeoDataFrame) -> dask_gpd.GeoDataFrame:
+        """Filter a dask dataframe based on the filtder_df and method."""
+        return ddf.sjoin(self.filter_df, predicate=self.method)
+
+    @property
+    def bounds(self) -> dict[str, float]:
+        """Boundaries of the all the geometries in filter_df."""
+        min_lon, min_lat, max_lon, max_lat = shapely.unary_union(self.filter_df.geometry).bounds
+        return {
+            "min_lon": min_lon,
+            "min_lat": min_lat,
+            "max_lon": max_lon,
+            "max_lat": max_lat,
+        }
