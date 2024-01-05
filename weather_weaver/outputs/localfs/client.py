@@ -31,7 +31,7 @@ class Client(StorageInterface):
     def delete(self, *, path: Path) -> None:
         """Delete object by path."""
         if not path.exists():
-            raise FileNotFoundError(f"file does not exist: {p}")
+            raise FileNotFoundError(f"file does not exist: {path}")
         if path.is_file():
             path.unlink()
         elif path.is_dir():
@@ -39,7 +39,7 @@ class Client(StorageInterface):
         else:
             raise ValueError(f"path is not a file or directory: {path}")
         logger.debug(
-            event="Deleted object",
+            event="Deleted path",
             path=path,
         )
         return
