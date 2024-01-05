@@ -4,6 +4,6 @@ from pathlib import Path
 
 class BaseProcessor(ABC):
     @abstractmethod
-    def process(self, *, raw_path: Path) -> None:
+    def transform(self, *, raw_path: Path) -> None:
         """Process a raw file."""
         pass

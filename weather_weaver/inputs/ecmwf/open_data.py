@@ -3,7 +3,12 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+import cfgrib
+import dask_geopandas as dask_gpd
+import geopandas as gpd
+import shapely
 import structlog
+import xarray as xr
 from ecmwf.opendata import Client as ECMWFClient
 
 from weather_weaver.inputs.ecmwf import constants
@@ -65,6 +70,14 @@ class ECMWFOpenDataRequest(BaseRequest):
             "step": self.forecast_steps,
         }
 
+    @property
+    def variables(self) -> list[str]:
+        """Returns list of variables based on the request stream type."""
+        id_vars = ["latitude", "longitude", "run_time", "step"]
+        if self.stream == StreamType.ENFO:
+            id_vars += ["number"]
+        return id_vars
+
 
 # ------- Fetcher model ------- #
 
@@ -113,6 +126,16 @@ class ECMWFOpenDataFetcher(FetcherInterface):
 
         destination_path = tmp_folder / f"{request.file_name}.grib2"
 
+        if destination_path.exists():
+            logger.debug(
+                event="Download raw files skipped.",
+                fetcher=self.__class__.__name__,
+                data_source=self.data_source,
+                request=request,
+                destination_path=destination_path,
+            )
+            return destination_path
+
         try:
             self.client.retrieve(
                 request=request.to_ecmwf_request(),
@@ -139,7 +162,120 @@ class ECMWFOpenDataFetcher(FetcherInterface):
 # ------- Processor model ------- #
 
 
+class GeoFilterModel:
+    def __init__(self, filter_df: gpd.GeoDataFrame, method: str) -> None:
+        self.filter_df = filter_df
+        self.method = method
+
+    def prefilter_dataset(self, dataset: xr.Dataset) -> xr.Dataset:
+        """Pre-filter a dataset using longitude (the most numerous dimension)."""
+        bounds = self.bounds
+        return dataset.sel(longitude=slice(bounds["min_lon"], bounds["max_lon"]))
+
+    def filter_dask(self, ddf: dask_gpd.GeoDataFrame) -> dask_gpd.GeoDataFrame:
+        """Filter a dask dataframe based on the filtder_df and method."""
+        return ddf.sjoin(self.filter_df, predicate=self.method)
+
+    @property
+    def bounds(self) -> dict[str, float]:
+        """Boundaries of the all the geometries in filter_df."""
+        min_lon, min_lat, max_lon, max_lat = shapely.unary_union(self.filter_df.geometry).bounds
+        return {
+            "min_lon": min_lon,
+            "min_lat": min_lat,
+            "max_lon": max_lon,
+            "max_lat": max_lat,
+        }
+
+
 class EMCWFOpenDataProcessor(BaseProcessor):
-    def process(self, *, raw_path: Path) -> None:
+    @staticmethod
+    def load(path: Path) -> list[xr.Dataset]:
+        """Load raw files."""
+        return cfgrib.open_datasets(
+            path=path,
+            chunks={
+                "time": 1,
+                "step": -1,
+                "longitude": "auto",
+                "latitude": "auto",
+            },
+            backend_kwargs={"indexpath": ""},
+        )
+
+    @staticmethod
+    def merge_datasets(datasets: list[xr.Dataset]) -> xr.Dataset:
+        """Merge all datasets into a single one."""
+        # each dataset is specific to a single param
+        for i, ds in enumerate(datasets):
+            # Delete unwanted coordinates
+            ds = ds.drop_vars(
+                names=[c for c in ds.coords if c not in constants.COORDINATE_ALLOW_LIST],
+                errors="ignore",
+            )
+            # Put the modified dataset back in the list
+            datasets[i] = ds
+
+        # merge all datasets
+        merged_dataset = xr.merge(
+            objects=datasets,
+            compat="override",
+            combine_attrs="drop_conflicts",
+        )
+        # rename time field to make explicit this is the init time
+        merged_dataset = merged_dataset.rename({"time": "run_time"})
+        return merged_dataset
+
+    @staticmethod
+    def process(
+        dataset: xr.Dataset,
+        id_vars: list[str],
+        normalise: bool = False,
+    ) -> dask_gpd.GeoDataFrame:
+        """Convert a xarray dataset to a dask GeoDataFrame."""
+        ddf = dataset.to_dask_dataframe()
+        if normalise:
+            ddf = ddf.melt(
+                id_vars=id_vars,
+                var_name="variable",
+                value_name="value",
+            )
+        # compute actual value_datetime
+        ddf["timestamp"] = ddf["run_time"] + ddf["step"]
+
+        # assign geometry
+        ddf = dask_gpd.from_dask_dataframe(
+            ddf,
+            geometry=dask_gpd.points_from_xy(ddf, "longitude", "latitude"),
+        )
+        ddf = ddf.set_crs(4326)
+        return ddf
+
+    @staticmethod
+    def post_process(ddf: dask_gpd.GeoDataFrame) -> dask_gpd.GeoDataFrame:
+        """Post process df by dropping non-required columns."""
+        ddf = ddf.drop(columns=["geometry", "index_right", "step"])
+        return ddf
+
+    def transform(
+        self,
+        raw_path: Path,
+        request: ECMWFOpenDataRequest,
+        filter_model: GeoFilterModel | None,
+        normalise: bool = False,
+    ) -> dask_gpd.GeoDataFrame:
         """Process raw file."""
-        ...
+        datasets = self.load(raw_path)
+        dataset = self.merge_datasets(datasets)
+        if filter_model is not None:
+            dataset = filter_model.prefilter_dataset(dataset)
+        ddf = self.process(
+            dataset=dataset,
+            id_vars=request.variables,
+            normalise=normalise,
+        )
+        if filter_model is not None:
+            ddf = filter_model.filter_dask(ddf)
+        ddf = self.post_process(ddf)
+
+        return ddf
