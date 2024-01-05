@@ -17,7 +17,7 @@ class StorageInterface(Protocol):
         """List the available files for requests."""
         pass
 
-    def store(self, *, ddf: dask.dataframe.DataFrame, destination_path: Path) -> bool:
+    def store(self, *, ddf: dask.dataframe.DataFrame, destination_path: Path) -> Path:
         """Store a dataset."""
         pass
 

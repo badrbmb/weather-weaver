@@ -99,11 +99,11 @@ class ECMWFOpenDataRequestBuilder(BaseRequestBuilder):
         for stream, request_type in zip(
             [
                 StreamType.OPER,
-                StreamType.ENFO,
+                # StreamType.ENFO,
             ],
             [
                 RequestType.FORECAST,
-                RequestType.PERTUBED_FORECAST,
+                # RequestType.PERTUBED_FORECAST,
             ],
         ):
             for run_time in list(RunTime):

@@ -18,7 +18,7 @@ class LocalClient(StorageInterface):
         """List the available files."""
         return folder.glob(f"*.{extension}")
 
-    def store(self, *, ddf: dask.dataframe.DataFrame, destination_path: Path) -> None:
+    def store(self, *, ddf: dask.dataframe.DataFrame, destination_path: Path) -> Path:
         """Store a dataset."""
         destination_path.parent.mkdir(parents=True, exist_ok=True)
         ddf.to_parquet(destination_path)
@@ -26,7 +26,7 @@ class LocalClient(StorageInterface):
             event="Stored DataFrame",
             destination_path=destination_path,
         )
-        return
+        return destination_path
 
     def delete(self, *, path: Path) -> None:
         """Delete object by path."""

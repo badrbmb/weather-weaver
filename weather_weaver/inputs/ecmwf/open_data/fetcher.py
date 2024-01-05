@@ -46,7 +46,7 @@ class ECMWFOpenDataFetcher(FetcherInterface):
         request: ECMWFOpenDataRequest,
         raw_dir: Path,
         update: bool = False,
-    ) -> Path | None:
+    ) -> Path:
         """Wrapper around ECMWF open data client."""
         destination_path = raw_dir / f"{request.file_name}.grib2"
         destination_path.parent.mkdir(parents=True, exist_ok=True)
