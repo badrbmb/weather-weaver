@@ -1,11 +1,14 @@
 import datetime as dt
 from enum import Enum
 
+import numpy as np
 import structlog
 import typer
 from dask.distributed import Client
+from distributed.protocol import dask_deserialize, dask_serialize
 from typing_extensions import Annotated
 
+from weather_weaver import constants
 from weather_weaver.inputs.ecmwf import constants as ecmwf_constants
 from weather_weaver.inputs.ecmwf.open_data.fetcher import ECMWFOpenDataFetcher
 from weather_weaver.inputs.ecmwf.open_data.processor import EMCWFOpenDataProcessor
@@ -18,6 +21,22 @@ app = typer.Typer()
 
 DEFAULT_DATE_FORMAT = "%Y-%m-%d"
 
+DEFAULT_WORKER_NUMBER = 1
+
+
+@dask_serialize.register(np.int64)
+def serialize_numpy_int64(x: np.int64) -> tuple[dict, list[bytes]]:
+    """Serialize numpy.int64."""
+    header = {}
+    frames = [x.tobytes()]
+    return header, frames
+
+
+@dask_deserialize.register(np.int64)
+def deserialize_numpy_int64(header: dict, frames: list[bytes]) -> np.int64:  # noqa: ARG001
+    """Deserialize numpy.int64."""
+    return np.frombuffer(frames[0], dtype=np.int64)[0]
+
 
 class DataSource(str, Enum):
     EMCWF_OPEN_DATA = "EMCWF [Open data]"
@@ -27,6 +46,10 @@ class DataSource(str, Enum):
 class StorageLocation(str, Enum):
     LOCAL_FS = "local"
     AWS_S3 = "s3"
+
+
+class Area(str, Enum):
+    ENTSOE = "entsoe"
 
 
 @app.command()
@@ -43,6 +66,10 @@ def download_datasets(
         DataSource,
         typer.Option(..., help="the source to download NPW data from."),
     ],
+    area: Annotated[
+        Area,
+        typer.Option(help="the geographical area to download data for."),
+    ] = Area.ENTSOE,
     storage: Annotated[
         StorageLocation,
         typer.Option(help="the location where to store processed files."),
@@ -51,6 +78,10 @@ def download_datasets(
         int,
         typer.Option(help="the number of days to download data for, starting from the start date."),
     ] = 1,
+    n_workers: Annotated[
+        int,
+        typer.Option(help="the number of workers in dask cluster."),
+    ] = DEFAULT_WORKER_NUMBER,
 ) -> None:
     """CLI method to download datasets."""
     # parse date str
@@ -63,10 +94,16 @@ def download_datasets(
         .date()
     )
 
+    match area:
+        case Area.ENTSOE:
+            country_iso3s = constants.ENTSO_E_ISO3_LIST
+        case _:
+            raise NotImplementedError(f"{area=} not implemented yet!")
+
     match source:
         case DataSource.EMCWF_OPEN_DATA:
             fetcher = ECMWFOpenDataFetcher()
-            request_builder = ECMWFOpenDataRequestBuilder()
+            request_builder = ECMWFOpenDataRequestBuilder(area=country_iso3s)
             processor = EMCWFOpenDataProcessor()
         case _:
             raise NotImplementedError(f"{source=} not implemented yet!")
@@ -87,22 +124,27 @@ def download_datasets(
     )
 
     # start a local dask cluster
-    dask_client = Client()
-
-    logger.info(
-        event="Dask cluster started",
-        url=dask_client.dashboard_link,
+    dask_client = Client(
+        name="Weather Weaver data download.",
+        n_workers=n_workers,
     )
 
-    _ = service.download_datasets(start=start, date_offset=date_offset)
-
-    # close the dask client
-    dask_client.close()
-
     logger.info(
-        event="Dask cluster closed",
+        event="Dask cluster started.",
         url=dask_client.dashboard_link,
+        n_workers=n_workers,
     )
+
+    try:
+        _ = service.download_datasets(start=start, date_offset=date_offset)
+    except Exception as e:
+        raise e
+    finally:
+        # close the dask client
+        dask_client.close()
+        logger.debug(
+            event="Dask cluster closed.",
+        )
 
 
 if __name__ == "__main__":

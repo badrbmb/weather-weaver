@@ -6,6 +6,7 @@ import xarray as xr
 
 from weather_weaver.inputs.ecmwf import constants
 from weather_weaver.inputs.ecmwf.open_data.request import ECMWFOpenDataRequest
+from weather_weaver.models.geotagger import GeoFilterModel
 from weather_weaver.models.processor import BaseProcessor
 
 
@@ -74,27 +75,30 @@ class EMCWFOpenDataProcessor(BaseProcessor):
 
     @staticmethod
     def post_process(ddf: dask_gpd.GeoDataFrame) -> dask_gpd.GeoDataFrame:
-        """Post process df by dropping non-required columns."""
-        ddf = ddf.drop(columns=["geometry", "index_right", "step"])
+        """Post process df by dropping non-required columns if they exist."""
+        columns_to_drop = ["geometry", "index_right", "step"]
+        existing_columns_to_drop = [col for col in columns_to_drop if col in ddf.columns]
+        ddf = ddf.drop(columns=existing_columns_to_drop)
         return ddf
 
     def transform(
         self,
         raw_path: Path,
         request: ECMWFOpenDataRequest,
+        geo_filter: GeoFilterModel | None = None,
     ) -> dask_gpd.GeoDataFrame:
         """Process raw file."""
         datasets = self.load(raw_path)
         dataset = self.merge_datasets(datasets)
-        if request.geo_filter is not None:
-            dataset = request.geo_filter.prefilter_dataset(dataset)
+        if geo_filter is not None:
+            dataset = geo_filter.prefilter_dataset(dataset)
         ddf = self.process(
             dataset=dataset,
             id_vars=request.variables,
             normalise=request.normalise_data,
         )
-        if request.geo_filter is not None:
-            ddf = request.geo_filter.filter_dask(ddf)
+        if geo_filter is not None:
+            ddf = geo_filter.filter_dask(ddf)
         ddf = self.post_process(ddf)
 
         return ddf

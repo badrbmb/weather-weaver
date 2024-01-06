@@ -7,6 +7,7 @@ import dask.dataframe
 import structlog
 
 from weather_weaver.models.fetcher import FetcherInterface
+from weather_weaver.models.geotagger import GeoFilterModel
 from weather_weaver.models.processor import BaseProcessor
 from weather_weaver.models.request import BaseRequest, BaseRequestBuilder
 from weather_weaver.models.storage import StorageInterface
@@ -15,6 +16,8 @@ dask.config.set({"array.slicing.split_large_chunks": True})
 logger = structlog.getLogger()
 
 DEFAULT_NPARTITIONS = dask.system.CPU_COUNT // 2 + 1
+
+MIN_VALID_SIZE_BYTES = 1e6
 
 
 class WeatherConsumerService:
@@ -39,6 +42,8 @@ class WeatherConsumerService:
         self.processor = processor
         self.storer = storer
         self.processed_dir = processed_dir
+        # get geofilter based on request area
+        self.geo_filter = GeoFilterModel.from_iso3_list(self.request_builder.area)
 
     def _build_default_requests(self, start: dt.date, date_offset: int) -> list[BaseRequest]:
         all_run_dates: list[dt.datetime] = [
@@ -69,6 +74,7 @@ class WeatherConsumerService:
             self.processor.transform(
                 raw_path=raw_path_request[0],
                 request=raw_path_request[1],
+                geo_filter=self.geo_filter,
             ),
             raw_path_request[1].file_name,
         )
@@ -101,6 +107,12 @@ class WeatherConsumerService:
             )  # store each transformed dataframe
         )
 
+    def _is_valid_file(self, path: Path, min_size_bytes: float = MIN_VALID_SIZE_BYTES) -> bool:
+        """Helper function to check if a file is valid."""
+        if self.storer.exists(path=path):
+            return path.stat().st_size > min_size_bytes
+        return False
+
     def download_datasets(self, start: dt.date, date_offset: int) -> list[Path]:
         """Download datasets for all dates between start and end."""
         start_time = time.perf_counter()
@@ -113,7 +125,9 @@ class WeatherConsumerService:
 
         # check the ones already processed
         all_new_requests = [
-            t for t in all_requests if not self.storer.exists(path=self.processed_dir / t.file_name)
+            t
+            for t in all_requests
+            if not self._is_valid_file(path=self.processed_dir / t.file_name)
         ]
 
         logger.debug(
@@ -127,7 +141,9 @@ class WeatherConsumerService:
             self._build_dask_pipeline(all_new_requests) if len(all_new_requests) > 0 else None
         )
         # run the pipeline
-        processed_files: list[Path] = pipeline.compute() if pipeline is not None else []
+        processed_files: list[Path] = (
+            pipeline.compute(scheduler="single-threaded") if pipeline is not None else []
+        )
 
         end_time = time.perf_counter()
         logger.info(

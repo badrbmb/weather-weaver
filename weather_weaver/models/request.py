@@ -13,6 +13,9 @@ class BaseRequest(ABC, BaseModel):
 
 
 class BaseRequestBuilder(ABC):
+    def __init__(self, *, area: list[str]) -> None:
+        self.area = area
+
     @abstractmethod
     def build_default_requests(self, run_date: dt.date) -> list[BaseRequest]:
         """Build a series of default requests compatible with a fetcher."""

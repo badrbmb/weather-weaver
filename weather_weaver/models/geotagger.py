@@ -39,7 +39,7 @@ def load_world_countries(resolution: str = "110m") -> gpd.GeoDataFrame:
 
 
 class GeoFilterModel:
-    def __init__(self, filter_df: gpd.GeoDataFrame, method: str) -> None:
+    def __init__(self, *, filter_df: gpd.GeoDataFrame, method: str) -> None:
         self.filter_df = filter_df
         self.method = method
 
@@ -49,7 +49,10 @@ class GeoFilterModel:
         return dataset.sel(longitude=slice(bounds["min_lon"], bounds["max_lon"]))
 
     def filter_dask(self, ddf: dask_gpd.GeoDataFrame) -> dask_gpd.GeoDataFrame:
-        """Filter a dask dataframe based on the filtder_df and method."""
+        """Filter a dask dataframe based on the fitlder_df and method.
+
+        Also used as a geotagging by asssigning the matching iso3 to each row in ddf.
+        """
         return ddf.sjoin(self.filter_df, predicate=self.method)
 
     @property
@@ -62,3 +65,12 @@ class GeoFilterModel:
             "max_lon": max_lon,
             "max_lat": max_lat,
         }
+
+    @classmethod
+    def from_iso3_list(cls, list_iso3s: list[str]) -> "GeoFilterModel":  # noqa: ANN102
+        """Create an instance of GeoFilterModel using a list of iso3s."""
+        world = load_world_countries()
+        return cls(
+            filter_df=world[world["country_iso3"].isin(list_iso3s)],
+            method="within",
+        )
