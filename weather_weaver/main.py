@@ -1,11 +1,9 @@
 import datetime as dt
 from enum import Enum
 
-import numpy as np
 import structlog
 import typer
 from dask.distributed import Client
-from distributed.protocol import dask_deserialize, dask_serialize
 from typing_extensions import Annotated
 
 from weather_weaver import constants
@@ -22,20 +20,6 @@ app = typer.Typer()
 DEFAULT_DATE_FORMAT = "%Y-%m-%d"
 
 DEFAULT_WORKER_NUMBER = 1
-
-
-@dask_serialize.register(np.int64)
-def serialize_numpy_int64(x: np.int64) -> tuple[dict, list[bytes]]:
-    """Serialize numpy.int64."""
-    header = {}
-    frames = [x.tobytes()]
-    return header, frames
-
-
-@dask_deserialize.register(np.int64)
-def deserialize_numpy_int64(header: dict, frames: list[bytes]) -> np.int64:  # noqa: ARG001
-    """Deserialize numpy.int64."""
-    return np.frombuffer(frames[0], dtype=np.int64)[0]
 
 
 class DataSource(str, Enum):

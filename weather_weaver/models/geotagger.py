@@ -43,17 +43,18 @@ class GeoFilterModel:
         self.filter_df = filter_df
         self.method = method
 
-    def prefilter_dataset(self, dataset: xr.Dataset) -> xr.Dataset:
-        """Pre-filter a dataset using longitude (the most numerous dimension)."""
+    def filter_dataset(self, dataset: xr.Dataset) -> xr.Dataset:
+        """Filter a dataset using longitude (the most numerous dimension)."""
         bounds = self.bounds
         return dataset.sel(longitude=slice(bounds["min_lon"], bounds["max_lon"]))
 
     def filter_dask(self, ddf: dask_gpd.GeoDataFrame) -> dask_gpd.GeoDataFrame:
-        """Filter a dask dataframe based on the fitlder_df and method.
+        """Filter a dask dataframe based on the filter_df and method.
 
-        Also used as a geotagging by asssigning the matching iso3 to each row in ddf.
+        Also used as a geotagging by assigning the matching iso3 to each row in ddf.
         """
         return ddf.sjoin(self.filter_df, predicate=self.method)
+        # return ddf
 
     @property
     def bounds(self) -> dict[str, float]:

@@ -56,7 +56,10 @@ class ECMWFOpenDataFetcher(FetcherInterface):
                 event="Download raw files skipped.",
                 fetcher=self.__class__.__name__,
                 data_source=self.data_source,
-                request=request,
+                run_date=request.run_date,
+                run_time=request.run_time,
+                stream=request.stream,
+                type=request.request_type,
                 destination_path=destination_path,
             )
             return destination_path

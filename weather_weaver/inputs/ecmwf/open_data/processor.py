@@ -91,7 +91,7 @@ class EMCWFOpenDataProcessor(BaseProcessor):
         datasets = self.load(raw_path)
         dataset = self.merge_datasets(datasets)
         if geo_filter is not None:
-            dataset = geo_filter.prefilter_dataset(dataset)
+            dataset = geo_filter.filter_dataset(dataset)
         ddf = self.process(
             dataset=dataset,
             id_vars=request.variables,

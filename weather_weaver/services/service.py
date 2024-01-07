@@ -82,7 +82,7 @@ class WeatherConsumerService:
     def _store(self, ddf_file_name: tuple[dask.dataframe.DataFrame, str]) -> Path:
         return self.storer.store(
             ddf=ddf_file_name[0],
-            destination_path=self.processed_dir / ddf_file_name[1],
+            destination_path=self.processed_dir / f"{ddf_file_name[1]}.parquet",
         )
 
     def _build_dask_pipeline(
@@ -127,7 +127,7 @@ class WeatherConsumerService:
         all_new_requests = [
             t
             for t in all_requests
-            if not self._is_valid_file(path=self.processed_dir / t.file_name)
+            if not self._is_valid_file(path=self.processed_dir / f"{t.file_name}.parquet")
         ]
 
         logger.debug(
@@ -142,7 +142,7 @@ class WeatherConsumerService:
         )
         # run the pipeline
         processed_files: list[Path] = (
-            pipeline.compute(scheduler="single-threaded") if pipeline is not None else []
+            pipeline.compute(optimize_graph=False) if pipeline is not None else []
         )
 
         end_time = time.perf_counter()
