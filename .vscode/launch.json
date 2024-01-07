@@ -1,0 +1,24 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "WeatherWeaver CLI",
+            "type": "python",
+            "request": "launch",
+            "program": "main.py",
+            "cwd": "${workspaceFolder}/weather_weaver",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--source", "EMCWF [Open data]",
+                "--storage", "local",
+                "--date-offset", "1",
+                "--n-workers", "4",
+                "2024-01-04",
+            ]
+        }
+    ]
+}

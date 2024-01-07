@@ -12,7 +12,6 @@ pandas = "^2.1.4"
 xarray = "^2023.12.0"
 zarr = "^2.16.1"
 pydantic = "^2.5.3"
-dask = {extras = ["distributed"], version = "^2023.12.1"}
 dask-geopandas = "^0.3.1"
 pyarrow = "^14.0.2"
 geopandas = "^0.14.1"
@@ -20,6 +19,10 @@ mapclassify = "^2.6.1"
 nbformat = "^5.9.2"
 structlog = "^23.3.0"
 lxml = "^5.0.0"
+graphviz = "^0.20.1"
+typer = {extras = ["all"], version = "^0.9.0"}
+dask = {extras = ["distributed"], version = "^2023.12.1"}
+msgpack-numpy = "^0.4.8"
 
 [tool.poetry.group.visualisation.dependencies]
 plotly = "^5.18.0"
@@ -32,6 +35,7 @@ mypy = "^1.8.0"
 ruff = "^0.1.9"
 rich = "^13.7.0"
 pre-commit = "^3.6.0"
+bokeh = "^3.3.2"
 
 [tool.poetry.group.ecmwf.dependencies]
 ecmwf-opendata = "^0.2.0"
