@@ -4,8 +4,10 @@ from pathlib import Path
 
 import dask
 import dask.dataframe
+import dask_geopandas as dask_gpd
 import structlog
 
+from weather_weaver.constants import MIN_VALID_SIZE_BYTES
 from weather_weaver.models.fetcher import FetcherInterface
 from weather_weaver.models.geotagger import GeoFilterModel
 from weather_weaver.models.processor import BaseProcessor
@@ -15,9 +17,7 @@ from weather_weaver.models.storage import StorageInterface
 dask.config.set({"array.slicing.split_large_chunks": True})
 logger = structlog.getLogger()
 
-DEFAULT_NPARTITIONS = dask.system.CPU_COUNT // 2 + 1
-
-MIN_VALID_SIZE_BYTES = 1e6
+MAX_THREADS = 4
 
 
 class WeatherConsumerService:
@@ -56,64 +56,65 @@ class WeatherConsumerService:
         # flatten and return list
         return [u for v in all_requests for u in v]
 
-    def _download_raw_file(self, requests: list[BaseRequest]) -> tuple[Path, BaseRequest]:
-        for request in requests:
-            yield (
-                self.fetcher.download_raw_file(
-                    request=request,
-                    raw_dir=self.raw_dir,
-                ),
-                request,
-            )
+    def _download(self, request: BaseRequest) -> tuple[Path | None, BaseRequest]:
+        raw_path = self.fetcher.download_raw_file(
+            raw_dir=self.raw_dir,
+            request=request,
+        )
+        return raw_path, request
 
-    def _transform(
+    def _process(
         self,
         raw_path_request: tuple[Path, BaseRequest],
-    ) -> tuple[dask.dataframe.DataFrame, str]:
-        return (
-            self.processor.transform(
-                raw_path=raw_path_request[0],
-                request=raw_path_request[1],
-                geo_filter=self.geo_filter,
-            ),
-            raw_path_request[1].file_name,
+    ) -> tuple[dask_gpd.GeoDataFrame, str]:
+        raw_path, request = raw_path_request
+        processed = self.processor.transform(
+            raw_path=raw_path,
+            request=request,
+            geo_filter=self.geo_filter,
         )
+        return processed, request.file_name
 
-    def _store(self, ddf_file_name: tuple[dask.dataframe.DataFrame, str]) -> Path:
+    def _store(
+        self,
+        processed_file_name: tuple[dask_gpd.GeoDataFrame, str],
+    ) -> Path:
+        processed, file_name = processed_file_name
         return self.storer.store(
-            ddf=ddf_file_name[0],
-            destination_path=self.processed_dir / f"{ddf_file_name[1]}.parquet",
+            ddf=processed,
+            destination_path=self.processed_dir / f"{file_name}.parquet",
         )
 
     def _build_dask_pipeline(
         self,
         all_new_requests: list[BaseRequest],
-        npartitions: int = DEFAULT_NPARTITIONS,
-    ) -> dask.bag:
-        """Build a dask depenceny graph."""
-        return (
-            dask.bag.from_sequence(
-                seq=all_new_requests,
-                npartitions=npartitions,
-            )
-            .map_partitions(
-                self._download_raw_file,
-            )  # download files in paralell
-            .map(
-                self._transform,
-            )  # transform each downloaded file
-            .map(
-                self._store,
-            )  # store each transformed dataframe
+        npartitions: int,
+    ) -> dask.bag.Bag:
+        dask_bag = (
+            dask.bag.from_sequence(seq=all_new_requests, npartitions=npartitions)
+            .map(self._download)
+            # filter out failed downloads
+            .filter(lambda raw_path_request: raw_path_request[0] is not None)
+            .map(self._process)
+            .map(self._store)
         )
+        return dask_bag
 
     def _is_valid_file(self, path: Path, min_size_bytes: float = MIN_VALID_SIZE_BYTES) -> bool:
         """Helper function to check if a file is valid."""
         if self.storer.exists(path=path):
-            return path.stat().st_size > min_size_bytes
+            if path.is_file():
+                total_size = path.stat().st_size
+            else:
+                total_size = sum(f.stat().st_size for f in path.glob("**/*") if f.is_file())
+            return total_size > min_size_bytes
         return False
 
-    def download_datasets(self, start: dt.date, date_offset: int) -> list[Path]:
+    def download_datasets(
+        self,
+        start: dt.date,
+        date_offset: int,
+    ) -> list[Path]:
         """Download datasets for all dates between start and end."""
         start_time = time.perf_counter()
         logger.info(
@@ -138,17 +139,21 @@ class WeatherConsumerService:
 
         # define the pipeline
         pipeline = (
-            self._build_dask_pipeline(all_new_requests) if len(all_new_requests) > 0 else None
+            self._build_dask_pipeline(
+                all_new_requests,
+                npartitions=len(all_new_requests),
+            )
+            if len(all_new_requests) > 0
+            else None
         )
         # run the pipeline
-        processed_files: list[Path] = (
-            pipeline.compute(optimize_graph=False) if pipeline is not None else []
-        )
+        processed_files: list[Path] = pipeline.compute() if pipeline is not None else []
 
         end_time = time.perf_counter()
         logger.info(
             event="Download datasets: END",
             count_processed_files=len(processed_files),
+            count_failed_files=len(all_new_requests) - len(processed_files),
             elapsed_time_secs=end_time - start_time,
         )
 

@@ -54,7 +54,6 @@ class GeoFilterModel:
         Also used as a geotagging by assigning the matching iso3 to each row in ddf.
         """
         return ddf.sjoin(self.filter_df, predicate=self.method)
-        # return ddf
 
     @property
     def bounds(self) -> dict[str, float]:

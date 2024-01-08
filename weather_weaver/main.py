@@ -3,7 +3,7 @@ from enum import Enum
 
 import structlog
 import typer
-from dask.distributed import Client
+from dask.distributed import Client, LocalCluster
 from typing_extensions import Annotated
 
 from weather_weaver import constants
@@ -20,6 +20,7 @@ app = typer.Typer()
 DEFAULT_DATE_FORMAT = "%Y-%m-%d"
 
 DEFAULT_WORKER_NUMBER = 1
+DEFAULT_THREADS_BY_WORKER = 5
 
 
 class DataSource(str, Enum):
@@ -66,6 +67,10 @@ def download_datasets(
         int,
         typer.Option(help="the number of workers in dask cluster."),
     ] = DEFAULT_WORKER_NUMBER,
+    threads_per_worker: Annotated[
+        int,
+        typer.Option(help="the number of threads per worker in the cluster."),
+    ] = DEFAULT_THREADS_BY_WORKER,
 ) -> None:
     """CLI method to download datasets."""
     # parse date str
@@ -108,19 +113,25 @@ def download_datasets(
     )
 
     # start a local dask cluster
-    dask_client = Client(
+    cluster = LocalCluster(
         name="Weather Weaver data download.",
         n_workers=n_workers,
+        threads_per_worker=threads_per_worker,
     )
+    dask_client = Client(cluster)
 
     logger.info(
         event="Dask cluster started.",
         url=dask_client.dashboard_link,
         n_workers=n_workers,
+        threads_per_worker=threads_per_worker,
     )
 
     try:
-        _ = service.download_datasets(start=start, date_offset=date_offset)
+        _ = service.download_datasets(
+            start=start,
+            date_offset=date_offset,
+        )
     except Exception as e:
         raise e
     finally:

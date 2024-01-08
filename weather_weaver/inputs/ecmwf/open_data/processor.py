@@ -68,9 +68,14 @@ class EMCWFOpenDataProcessor(BaseProcessor):
         # assign geometry
         ddf = dask_gpd.from_dask_dataframe(
             ddf,
-            geometry=dask_gpd.points_from_xy(ddf, "longitude", "latitude"),
+            geometry=dask_gpd.points_from_xy(
+                ddf,
+                "longitude",
+                "latitude",
+                # crs=4326, # TODO: investigate why param is not set on ddf using points_from_xy
+            ),
         )
-        ddf = ddf.set_crs(4326)
+        ddf.crs = 4326
         return ddf
 
     @staticmethod
@@ -100,5 +105,7 @@ class EMCWFOpenDataProcessor(BaseProcessor):
         if geo_filter is not None:
             ddf = geo_filter.filter_dask(ddf)
         ddf = self.post_process(ddf)
+
+        del dataset
 
         return ddf

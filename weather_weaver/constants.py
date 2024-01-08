@@ -1,3 +1,6 @@
+# minimum size to consider a file (raw / processed) to be valid
+MIN_VALID_SIZE_BYTES = 1e6
+
 # list of iso3 countries member of ENTSO-E
 ENTSO_E_ISO3_LIST = [
     "NOR",

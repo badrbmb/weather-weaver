@@ -3,6 +3,7 @@ from pathlib import Path
 import structlog
 from ecmwf.opendata import Client as ECMWFClient
 
+from weather_weaver.constants import MIN_VALID_SIZE_BYTES
 from weather_weaver.inputs.ecmwf import constants
 from weather_weaver.inputs.ecmwf.open_data.request import ECMWFOpenDataRequest
 from weather_weaver.models.fetcher import FetcherInterface
@@ -46,12 +47,17 @@ class ECMWFOpenDataFetcher(FetcherInterface):
         request: ECMWFOpenDataRequest,
         raw_dir: Path,
         update: bool = False,
+        min_size_bytes: float = MIN_VALID_SIZE_BYTES,
     ) -> Path:
         """Wrapper around ECMWF open data client."""
         destination_path = raw_dir / f"{request.file_name}.grib2"
         destination_path.parent.mkdir(parents=True, exist_ok=True)
 
-        if destination_path.exists() and not update:
+        if (
+            destination_path.exists()
+            and destination_path.stat().st_size > min_size_bytes
+            and not update
+        ):
             logger.debug(
                 event="Download raw files skipped.",
                 fetcher=self.__class__.__name__,
@@ -81,7 +87,10 @@ class ECMWFOpenDataFetcher(FetcherInterface):
             event="Download raw files complete.",
             fetcher=self.__class__.__name__,
             data_source=self.data_source,
-            request=request,
+            run_date=request.run_date,
+            run_time=request.run_time,
+            stream=request.stream,
+            type=request.request_type,
             destination_path=destination_path,
         )
         return destination_path
