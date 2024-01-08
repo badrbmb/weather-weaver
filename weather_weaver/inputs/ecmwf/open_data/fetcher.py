@@ -81,6 +81,9 @@ class ECMWFOpenDataFetcher(FetcherInterface):
                 error=e,
                 request=request,
             )
+            # delete partial download file
+            if destination_path.is_file():
+                destination_path.unlink()
             return None
 
         logger.debug(
