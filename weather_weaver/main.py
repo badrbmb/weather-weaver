@@ -3,15 +3,17 @@ from enum import Enum
 
 import structlog
 import typer
-from dask.distributed import Client, LocalCluster
+from dask.distributed import Client
+from distributed import SpecCluster
 from typing_extensions import Annotated
 
 from weather_weaver import constants
 from weather_weaver.inputs.ecmwf import constants as ecmwf_constants
-from weather_weaver.inputs.ecmwf.open_data.fetcher import ECMWFOpenDataFetcher
-from weather_weaver.inputs.ecmwf.open_data.request import ECMWFOpenDataRequestBuilder
-from weather_weaver.inputs.ecmwf.processor import EMCWFProcessor
+from weather_weaver.models.fetcher import FetcherInterface
 from weather_weaver.models.geo import GeoFilterModel
+from weather_weaver.models.processor import BaseProcessor
+from weather_weaver.models.request import BaseRequestBuilder
+from weather_weaver.models.storage import StorageInterface
 from weather_weaver.outputs.localfs.client import LocalClient
 from weather_weaver.services.service import WeatherConsumerService
 
@@ -25,7 +27,8 @@ DEFAULT_THREADS_BY_WORKER = 5
 
 
 class DataSource(str, Enum):
-    EMCWF_OPEN_DATA = "EMCWF [Open data]"
+    ECMWF_OPEN_DATA = "ECMWF [Open data]"
+    ECMWF_CDS_ERA5 = "ECMWF ERA5"
 
 
 class StorageLocation(str, Enum):
@@ -35,6 +38,88 @@ class StorageLocation(str, Enum):
 
 class Area(str, Enum):
     ENTSOE = "entsoe"
+
+
+class ClusterType(str, Enum):
+    LOCAL = "local"
+
+
+def load_area(area: Area) -> GeoFilterModel:
+    """Load geofilter matching the specified area."""
+    match area:
+        case Area.ENTSOE:
+            geo_filter = GeoFilterModel.from_bounding_box(
+                constants.EUROPE_BOUNDING_BOX_STR,
+            ).filter_iso3s(constants.ENTSO_E_ISO3_LIST)
+
+        case _:
+            raise NotImplementedError(f"{area=} not implemented yet!")
+    return geo_filter
+
+
+def load_source(
+    source: DataSource,
+    geo_filter: GeoFilterModel,
+) -> tuple[FetcherInterface, BaseRequestBuilder, BaseProcessor]:
+    """Load fetcher, builder and processor for a given data source."""
+    match source:
+        case DataSource.ECMWF_OPEN_DATA:
+            from weather_weaver.inputs.ecmwf.open_data.fetcher import (
+                ECMWFOpenDataFetcher,
+            )
+            from weather_weaver.inputs.ecmwf.open_data.request import (
+                ECMWFOpenDataRequestBuilder,
+            )
+            from weather_weaver.inputs.ecmwf.processor import EMCWFProcessor
+
+            fetcher = ECMWFOpenDataFetcher()
+            request_builder = ECMWFOpenDataRequestBuilder(geo_filter=geo_filter)
+            processor = EMCWFProcessor()
+        case DataSource.ECMWF_CDS_ERA5:
+            from weather_weaver.inputs.ecmwf.cds.fetcher import ECMWFCDSFetcher
+            from weather_weaver.inputs.ecmwf.cds.request import ECMWFCDSRequestBuilder
+            from weather_weaver.inputs.ecmwf.processor import EMCWFProcessor
+
+            fetcher = ECMWFCDSFetcher()
+            request_builder = ECMWFCDSRequestBuilder(geo_filter=geo_filter)
+            processor = EMCWFProcessor()
+        case _:
+            raise NotImplementedError(f"{source=} not implemented yet!")
+
+    return fetcher, request_builder, processor
+
+
+def load_storage(storage: StorageLocation) -> StorageInterface:
+    """Load storer."""
+    match storage:
+        case StorageLocation.LOCAL_FS:
+            storer = LocalClient()
+        case _:
+            raise NotImplementedError(f"{storage=} not implemented yet!")
+
+    return storer
+
+
+def load_cluster(
+    cluster_type: ClusterType,
+    n_workers: int,
+    threads_per_worker: int,
+    name: str = "Weather Weaver data download cluster.",
+) -> SpecCluster:
+    """Load cluster."""
+    match cluster_type:
+        case ClusterType.LOCAL:
+            from distributed import LocalCluster
+
+            cluster = LocalCluster(
+                name=name,
+                n_workers=n_workers,
+                threads_per_worker=threads_per_worker,
+            )
+        case _:
+            raise NotImplementedError(f"{cluster_type=} not implemented yet!")
+
+    return cluster
 
 
 @app.command()
@@ -63,6 +148,10 @@ def download_datasets(
         int,
         typer.Option(help="the number of days to download data for, starting from the start date."),
     ] = 1,
+    cluster_type: Annotated[
+        ClusterType,
+        typer.Option(help="the type of cluster."),
+    ] = ClusterType.LOCAL,
     n_workers: Annotated[
         int,
         typer.Option(help="the number of workers in dask cluster."),
@@ -83,28 +172,15 @@ def download_datasets(
         .date()
     )
 
-    match area:
-        case Area.ENTSOE:
-            geo_filter = GeoFilterModel.from_bounding_box(
-                constants.EUROPE_BOUNDING_BOX_STR,
-            ).filter_iso3s(constants.ENTSO_E_ISO3_LIST)
+    # load all ressources
+    geo_filter = load_area(area)
 
-        case _:
-            raise NotImplementedError(f"{area=} not implemented yet!")
+    fetcher, request_builder, processor = load_source(
+        source=source,
+        geo_filter=geo_filter,
+    )
 
-    match source:
-        case DataSource.EMCWF_OPEN_DATA:
-            fetcher = ECMWFOpenDataFetcher()
-            request_builder = ECMWFOpenDataRequestBuilder(geo_filter=geo_filter)
-            processor = EMCWFProcessor()
-        case _:
-            raise NotImplementedError(f"{source=} not implemented yet!")
-
-    match storage:
-        case StorageLocation.LOCAL_FS:
-            storer = LocalClient()
-        case _:
-            raise NotImplementedError(f"{storage=} not implemented yet!")
+    storer = load_storage(storage=storage)
 
     service = WeatherConsumerService(
         request_builder=request_builder,
@@ -115,12 +191,13 @@ def download_datasets(
         storer=storer,
     )
 
-    # start a local dask cluster
-    cluster = LocalCluster(
-        name="Weather Weaver data download.",
+    cluster = load_cluster(
+        cluster_type=cluster_type,
         n_workers=n_workers,
         threads_per_worker=threads_per_worker,
     )
+
+    # start a local dask cluster
     dask_client = Client(cluster)
 
     logger.info(
