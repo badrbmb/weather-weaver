@@ -13,7 +13,7 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "--source", "EMCWF [Open data]",
+                "--source", "ECMWF [Open data]",
                 "--storage", "local",
                 "--date-offset", "20",
                 "--n-workers", "2",

@@ -101,6 +101,17 @@ class GeoFilterModel:
             "max_lat": max_lat,
         }
 
+    @property
+    def bounding_box(self) -> BoundingBox:
+        """Returns BoundingBox from geometry bounds."""
+        bounds = self.bounds
+        return BoundingBox(
+            north=bounds["max_lat"],
+            west=bounds["min_lon"],
+            south=bounds["min_lat"],
+            east=bounds["max_lon"],
+        )
+
     def filter_iso3s(self, list_iso3s: list[str]) -> "GeoFilterModel":
         """Create an instance of GeoFilterModel using a list of iso3s."""
         return GeoFilterModel(

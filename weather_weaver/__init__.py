@@ -1,4 +1,4 @@
-# TODO investigate issue link with the following
+# TODO: investigate issue link with the following
 # https://github.com/geopandas/dask-geopandas/pull/113
 # https://github.com/geopandas/dask-geopandas/issues/237
 # https://github.com/dask/dask/issues/9072

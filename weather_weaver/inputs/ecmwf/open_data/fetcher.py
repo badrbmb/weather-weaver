@@ -4,7 +4,7 @@ import structlog
 from ecmwf.opendata import Client as ECMWFClient
 
 from weather_weaver.constants import MIN_VALID_SIZE_BYTES
-from weather_weaver.inputs.ecmwf import constants
+from weather_weaver.inputs.ecmwf.open_data import constants
 from weather_weaver.inputs.ecmwf.open_data.request import ECMWFOpenDataRequest
 from weather_weaver.models.fetcher import FetcherInterface
 

@@ -2,7 +2,7 @@ import datetime as dt
 from enum import Enum
 from typing import Any, Generator
 
-from weather_weaver.inputs.ecmwf import constants
+from weather_weaver.inputs.ecmwf.open_data import constants
 from weather_weaver.models.request import BaseRequest, BaseRequestBuilder
 
 

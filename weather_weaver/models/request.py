@@ -19,7 +19,10 @@ class BaseRequestBuilder(ABC):
         self.geo_filter = geo_filter
 
     @abstractmethod
-    def build_default_requests(self, run_date: dt.date) -> list[BaseRequest]:
+    def build_default_requests(
+        self,
+        run_date: dt.date,
+    ) -> list[BaseRequest]:
         """Build a series of default requests compatible with a fetcher."""
         pass
 
