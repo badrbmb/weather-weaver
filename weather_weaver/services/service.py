@@ -6,12 +6,14 @@ import dask
 import dask.dataframe
 import dask_geopandas as dask_gpd
 import structlog
+from pandas.tseries.offsets import DateOffset
 
 from weather_weaver.constants import MIN_VALID_SIZE_BYTES
 from weather_weaver.models.fetcher import FetcherInterface
 from weather_weaver.models.processor import BaseProcessor
 from weather_weaver.models.request import BaseRequest, BaseRequestBuilder
 from weather_weaver.models.storage import StorageInterface
+from weather_weaver.utils import OffsetFrequency
 
 dask.config.set({"array.slicing.split_large_chunks": True})
 logger = structlog.getLogger()
@@ -42,9 +44,29 @@ class WeatherConsumerService:
         self.storer = storer
         self.processed_dir = processed_dir
 
-    def _build_default_requests(self, start: dt.date, date_offset: int) -> list[BaseRequest]:
+    @staticmethod
+    def _date_offset(offset_frequency: OffsetFrequency, offset: int) -> DateOffset:
+        match offset_frequency:
+            case OffsetFrequency.DAILY:
+                return DateOffset(days=offset)
+            case OffsetFrequency.YEARLY:
+                return DateOffset(years=offset)
+            case _:
+                raise NotImplementedError(f"{offset_frequency=} not implemented yet!")
+
+    def _build_default_requests(
+        self,
+        start: dt.date,
+        date_offset: int,
+        offset_frequency: OffsetFrequency,
+    ) -> list[BaseRequest]:
         all_run_dates: list[dt.datetime] = [
-            start + dt.timedelta(days=i) for i in range(date_offset)
+            start
+            + self._date_offset(
+                offset=i,
+                offset_frequency=offset_frequency,
+            )
+            for i in range(date_offset)
         ]
         all_requests: list[list[BaseRequest]] = [
             self.request_builder.build_default_requests(run_date=run_date)
@@ -110,6 +132,7 @@ class WeatherConsumerService:
         self,
         start: dt.date,
         date_offset: int,
+        offset_frequency: OffsetFrequency,
     ) -> list[Path]:
         """Download datasets for all dates between start and end."""
         start_time = time.perf_counter()
@@ -118,7 +141,11 @@ class WeatherConsumerService:
             start=start,
             date_offset=date_offset,
         )
-        all_requests = self._build_default_requests(start=start, date_offset=date_offset)
+        all_requests = self._build_default_requests(
+            start=start,
+            date_offset=date_offset,
+            offset_frequency=offset_frequency,
+        )
 
         # check the ones already processed
         all_new_requests = [

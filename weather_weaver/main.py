@@ -16,6 +16,7 @@ from weather_weaver.models.request import BaseRequestBuilder
 from weather_weaver.models.storage import StorageInterface
 from weather_weaver.outputs.localfs.client import LocalClient
 from weather_weaver.services.service import WeatherConsumerService
+from weather_weaver.utils import OffsetFrequency
 
 logger = structlog.getLogger()
 app = typer.Typer()
@@ -148,6 +149,10 @@ def download_datasets(
         int,
         typer.Option(help="the number of days to download data for, starting from the start date."),
     ] = 1,
+    offset_frequency: Annotated[
+        OffsetFrequency,
+        typer.Option(help="the frequency of the date_offset."),
+    ] = OffsetFrequency.DAILY,
     cluster_type: Annotated[
         ClusterType,
         typer.Option(help="the type of cluster."),
@@ -211,6 +216,7 @@ def download_datasets(
         _ = service.download_datasets(
             start=start,
             date_offset=date_offset,
+            offset_frequency=offset_frequency,
         )
     except Exception as e:
         raise e
