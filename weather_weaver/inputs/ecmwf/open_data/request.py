@@ -41,6 +41,7 @@ class ECMWFOpenDataRequest(BaseRequest):
                 self.run_date.strftime("%Y%m%d"),
                 f"{str(self.run_time.value).zfill(2)}z",
                 f"{self.forecast_steps[0]}-{self.forecast_steps[-1]}",
+                "-".join(self.nwp_parameters),
                 self.request_type.value,
             ],
         )
@@ -82,7 +83,7 @@ class ECMWFOpenDataRequestBuilder(BaseRequestBuilder):
         for all forecasting steps as defined in constants.FORECAST_STEPS,
         covering the following stream / request types / run_times
         - oper + fc @ all run times
-        - ens + pfc @ all run times
+        # - ens + pfc @ all run times
         """
         all_requests = []
         for stream, request_type in zip(

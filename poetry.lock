@@ -113,6 +113,21 @@ files = [
 jinja2 = "*"
 
 [[package]]
+name = "cdsapi"
+version = "0.6.1"
+description = "Climate Data Store API"
+category = "dev"
+optional = false
+python-versions = "*"
+files = [
+    {file = "cdsapi-0.6.1.tar.gz", hash = "sha256:7d40c58e3fd3e75a8acdcdc81eab4ef9b6f763b2902ba01d7d1738f3652a5a30"},
+]
+
+[package.dependencies]
+requests = ">=2.5.0"
+tqdm = "*"
+
+[[package]]
 name = "certifi"
 version = "2023.11.17"
 description = "Python package for providing Mozilla's CA Bundle."
@@ -3576,4 +3591,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "1719c138331ed614acb734e0576ce222b593f5aa2a6a9dc1fb0200ef51114b03"
+content-hash = "3d0431b38f92159e75f1a4a54b5ae1c043e56928a7f8814252093f951e766d05"

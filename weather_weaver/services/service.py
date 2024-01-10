@@ -9,7 +9,6 @@ import structlog
 
 from weather_weaver.constants import MIN_VALID_SIZE_BYTES
 from weather_weaver.models.fetcher import FetcherInterface
-from weather_weaver.models.geotagger import GeoFilterModel
 from weather_weaver.models.processor import BaseProcessor
 from weather_weaver.models.request import BaseRequest, BaseRequestBuilder
 from weather_weaver.models.storage import StorageInterface
@@ -42,8 +41,6 @@ class WeatherConsumerService:
         self.processor = processor
         self.storer = storer
         self.processed_dir = processed_dir
-        # get geofilter based on request area
-        self.geo_filter = GeoFilterModel.from_iso3_list(self.request_builder.area)
 
     def _build_default_requests(self, start: dt.date, date_offset: int) -> list[BaseRequest]:
         all_run_dates: list[dt.datetime] = [
@@ -70,8 +67,7 @@ class WeatherConsumerService:
         raw_path, request = raw_path_request
         processed = self.processor.transform(
             raw_path=raw_path,
-            request=request,
-            geo_filter=self.geo_filter,
+            geo_filter=self.request_builder.geo_filter,
         )
         return processed, request.file_name
 

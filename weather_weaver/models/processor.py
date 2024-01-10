@@ -3,8 +3,7 @@ from pathlib import Path
 
 import dask_geopandas as dask_gpd
 
-from weather_weaver.models.geotagger import GeoFilterModel
-from weather_weaver.models.request import BaseRequest
+from weather_weaver.models.geo import GeoFilterModel
 
 
 class BaseProcessor(ABC):
@@ -13,7 +12,6 @@ class BaseProcessor(ABC):
         self,
         *,
         raw_path: Path,
-        request: BaseRequest,
         geo_filter: GeoFilterModel | None = None,
     ) -> dask_gpd.GeoDataFrame:
         """Process a raw file given a request.

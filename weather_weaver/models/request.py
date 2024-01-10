@@ -4,6 +4,8 @@ from typing import Generator
 
 from pydantic import BaseModel
 
+from weather_weaver.models.geo import GeoFilterModel
+
 
 class BaseRequest(ABC, BaseModel):
     @abstractproperty
@@ -13,8 +15,8 @@ class BaseRequest(ABC, BaseModel):
 
 
 class BaseRequestBuilder(ABC):
-    def __init__(self, *, area: list[str]) -> None:
-        self.area = area
+    def __init__(self, *, geo_filter: GeoFilterModel) -> None:
+        self.geo_filter = geo_filter
 
     @abstractmethod
     def build_default_requests(self, run_date: dt.date) -> list[BaseRequest]:

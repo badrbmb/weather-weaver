@@ -39,3 +39,6 @@ ENTSO_E_ISO3_LIST = [
     "SRB",
     "MNE",
 ]
+
+# europe bounding box (as defined by ECMWF)
+EUROPE_BOUNDING_BOX_STR = "N: 73.5 W: -27 S: 33 E: 45"

@@ -9,8 +9,9 @@ from typing_extensions import Annotated
 from weather_weaver import constants
 from weather_weaver.inputs.ecmwf import constants as ecmwf_constants
 from weather_weaver.inputs.ecmwf.open_data.fetcher import ECMWFOpenDataFetcher
-from weather_weaver.inputs.ecmwf.open_data.processor import EMCWFOpenDataProcessor
 from weather_weaver.inputs.ecmwf.open_data.request import ECMWFOpenDataRequestBuilder
+from weather_weaver.inputs.ecmwf.processor import EMCWFProcessor
+from weather_weaver.models.geo import GeoFilterModel
 from weather_weaver.outputs.localfs.client import LocalClient
 from weather_weaver.services.service import WeatherConsumerService
 
@@ -25,7 +26,6 @@ DEFAULT_THREADS_BY_WORKER = 5
 
 class DataSource(str, Enum):
     EMCWF_OPEN_DATA = "EMCWF [Open data]"
-    EMCWF_ARCHIVE = "EMCWF [Archive (2017-2020)]"
 
 
 class StorageLocation(str, Enum):
@@ -85,15 +85,18 @@ def download_datasets(
 
     match area:
         case Area.ENTSOE:
-            country_iso3s = constants.ENTSO_E_ISO3_LIST
+            geo_filter = GeoFilterModel.from_bounding_box(
+                constants.EUROPE_BOUNDING_BOX_STR,
+            ).filter_iso3s(constants.ENTSO_E_ISO3_LIST)
+
         case _:
             raise NotImplementedError(f"{area=} not implemented yet!")
 
     match source:
         case DataSource.EMCWF_OPEN_DATA:
             fetcher = ECMWFOpenDataFetcher()
-            request_builder = ECMWFOpenDataRequestBuilder(area=country_iso3s)
-            processor = EMCWFOpenDataProcessor()
+            request_builder = ECMWFOpenDataRequestBuilder(geo_filter=geo_filter)
+            processor = EMCWFProcessor()
         case _:
             raise NotImplementedError(f"{source=} not implemented yet!")
 

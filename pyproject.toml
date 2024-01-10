@@ -40,6 +40,7 @@ bokeh = "^3.3.2"
 [tool.poetry.group.ecmwf.dependencies]
 ecmwf-opendata = "^0.2.0"
 cfgrib = "^0.9.10.4"
+cdsapi = "^0.6.1"
 
 [build-system]
 requires = ["poetry-core"]
