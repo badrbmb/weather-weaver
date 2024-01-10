@@ -13,11 +13,11 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "--source", "ECMWF [Open data]",
+                "--source", "ECMWF ERA5",
                 "--storage", "local",
-                "--date-offset", "20",
-                "--n-workers", "2",
-                "--threads-per-worker", "4",
+                "--date-offset", "1",
+                "--n-workers", "1",
+                "--threads-per-worker", "1",
                 "2023-01-01",
             ]
         }

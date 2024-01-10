@@ -3,6 +3,8 @@ import hashlib
 from enum import Enum
 from typing import Any, Generator
 
+from pydantic import field_serializer
+
 from weather_weaver.inputs.ecmwf.cds import constants
 from weather_weaver.models.geo import BoundingBox
 from weather_weaver.models.request import BaseRequest, BaseRequestBuilder
@@ -26,15 +28,23 @@ class ECMWFCDSRequest(BaseRequest):
     product_type: ProductType
     area: BoundingBox
 
+    class Config:  # noqa: D106
+        arbitrary_types_allowed = True
+
+    @field_serializer("area")
+    def serialize_area(self, area: BoundingBox, _info) -> str:  # noqa: ANN001
+        """Custom serializer for bounding box."""
+        return area.geometry.wkt
+
     @property
     def file_name(self) -> str:
         """File name based on request parameters."""
         params_json = self.model_dump_json()
-        return f"{self.dataset.value}/{hashlib.sha256(params_json.encode("utf-8")).hexdigest()}"
+        return f"{self.dataset.value}/{hashlib.sha1(params_json.encode("utf-8")).hexdigest()}"  # noqa: S324
 
     def to_cds_request(self) -> dict[str, Any]:
         """Create request compatible with CDS client."""
-        latlon_bounds = self.bounding_box.to_latlon_dict()
+        latlon_bounds = self.area.to_latlon_dict()
         return {
             "product_type": self.product_type.value,
             "variable": self.nwp_parameters,
@@ -80,6 +90,7 @@ class ECMWFCDSRequestBuilder(BaseRequestBuilder):
                 times=constants.DEFAULT_TIMES,
                 product_type=ProductType.REANALYSIS,
                 area=self.geo_filter.bounding_box,
+                nwp_parameters=constants.NWP_PARAMETERS,
             ),
         ]
 

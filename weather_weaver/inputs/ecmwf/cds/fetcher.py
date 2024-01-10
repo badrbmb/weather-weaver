@@ -51,14 +51,14 @@ class ECMWFCDSFetcher(FetcherInterface):
             return destination_path
 
         try:
+            logger.debug(
+                event="Download raw files starting, check status @url",
+                url="https://cds.climate.copernicus.eu/cdsapp#!/yourrequests",
+            )
             self.client.retrieve(
                 name=request.dataset.value,
                 request=request.to_cds_request(),
                 target=destination_path,
-            )
-            logger.debug(
-                event="Download raw files started, check status @url",
-                url="https://cds.climate.copernicus.eu/cdsapp#!/yourrequests",
             )
         except Exception as e:
             logger.error(
