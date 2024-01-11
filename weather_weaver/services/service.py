@@ -61,11 +61,15 @@ class WeatherConsumerService:
         offset_frequency: OffsetFrequency,
     ) -> list[BaseRequest]:
         all_run_dates: list[dt.datetime] = [
-            start
-            + self._date_offset(
-                offset=i,
-                offset_frequency=offset_frequency,
+            (
+                start
+                + self._date_offset(
+                    offset=i,
+                    offset_frequency=offset_frequency,
+                )
             )
+            .to_pydatetime()
+            .date()
             for i in range(date_offset)
         ]
         all_requests: list[list[BaseRequest]] = [
@@ -140,6 +144,7 @@ class WeatherConsumerService:
             event="Download datasets: START",
             start=start,
             date_offset=date_offset,
+            offset_frequency=offset_frequency.value,
         )
         all_requests = self._build_default_requests(
             start=start,

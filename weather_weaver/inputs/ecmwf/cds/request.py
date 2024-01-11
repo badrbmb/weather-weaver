@@ -40,7 +40,10 @@ class ECMWFCDSRequest(BaseRequest):
     def file_name(self) -> str:
         """File name based on request parameters."""
         params_json = self.model_dump_json()
-        return f"{self.dataset.value}/{hashlib.sha1(params_json.encode("utf-8")).hexdigest()}"  # noqa: S324
+        years = "-".join(self.years)
+        return (
+            f"{self.dataset.value}/{years}-{hashlib.sha1(params_json.encode("utf-8")).hexdigest()}"  # noqa: S324
+        )
 
     def to_cds_request(self) -> dict[str, Any]:
         """Create request compatible with CDS client."""
