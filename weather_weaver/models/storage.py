@@ -13,6 +13,9 @@ class StorageInterface(Protocol):
         """Check if file exists in store."""
         pass
 
+    def is_valid(self, *, path: Path, min_size_bytes: float) -> bool:
+        """Check if a file is valid."""
+
     def list_files_for_request(self, *, requests: list[BaseRequest]) -> list[Path]:
         """List the available files for requests."""
         pass

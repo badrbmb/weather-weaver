@@ -4,6 +4,7 @@ from pathlib import Path
 import dask.dataframe
 import structlog
 
+from weather_weaver.constants import MIN_VALID_SIZE_BYTES
 from weather_weaver.models.storage import StorageInterface
 
 logger = structlog.getLogger()
@@ -13,6 +14,16 @@ class LocalClient(StorageInterface):
     def exists(self, *, path: Path) -> bool:
         """Check if file exists."""
         return path.exists()
+
+    def is_valid(self, *, path: Path, min_size_bytes: float = MIN_VALID_SIZE_BYTES) -> bool:
+        """Check if a file is valid."""
+        if self.exists(path=path):
+            if path.is_file():
+                total_size = path.stat().st_size
+            else:
+                total_size = sum(f.stat().st_size for f in path.glob("**/*") if f.is_file())
+            return total_size > min_size_bytes
+        return False
 
     def list_files_for_request(self, *, folder: Path, extension: str = "parquet") -> list[Path]:
         """List the available files."""

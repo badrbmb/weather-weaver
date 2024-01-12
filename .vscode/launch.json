@@ -13,13 +13,13 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "--source", "ECMWF ERA5",
+                "--source", "ECMWF [Open data]",
                 "--storage", "local",
-                "--date-offset", "3",
-                "--offset-frequency", "yearly",
-                "--n-workers", "1",
+                "--date-offset", "12",
+                "--offset-frequency", "daily",
+                "--n-workers", "2",
                 "--threads-per-worker", "4",
-                "2020-01-01",
+                "2024-01-01",
             ]
         }
     ]

@@ -8,7 +8,6 @@ import dask_geopandas as dask_gpd
 import structlog
 from pandas.tseries.offsets import DateOffset
 
-from weather_weaver.constants import MIN_VALID_SIZE_BYTES
 from weather_weaver.models.fetcher import FetcherInterface
 from weather_weaver.models.processor import BaseProcessor
 from weather_weaver.models.request import BaseRequest, BaseRequestBuilder
@@ -122,16 +121,6 @@ class WeatherConsumerService:
         )
         return dask_bag
 
-    def _is_valid_file(self, path: Path, min_size_bytes: float = MIN_VALID_SIZE_BYTES) -> bool:
-        """Helper function to check if a file is valid."""
-        if self.storer.exists(path=path):
-            if path.is_file():
-                total_size = path.stat().st_size
-            else:
-                total_size = sum(f.stat().st_size for f in path.glob("**/*") if f.is_file())
-            return total_size > min_size_bytes
-        return False
-
     def download_datasets(
         self,
         start: dt.date,
@@ -156,7 +145,9 @@ class WeatherConsumerService:
         all_new_requests = [
             t
             for t in all_requests
-            if not self._is_valid_file(path=self.processed_dir / f"{t.file_name}.parquet")
+            if not self.storer.is_valid(
+                path=self.processed_dir / f"{t.file_name}.parquet",
+            )
         ]
 
         logger.debug(
