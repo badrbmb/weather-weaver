@@ -12,3 +12,5 @@ DEFAULT_MONTHS = [str(t) for t in range(1, 13)]
 DEFAULT_DAYS = [str(t) for t in range(1, 32)]
 
 DEFAULT_TIMES = [f"{str(t).zfill(2)}:00" for t in range(24)]
+
+COORDINATE_ALLOW_LIST: list[str] = ["valid_time", "latitude", "longitude"]
