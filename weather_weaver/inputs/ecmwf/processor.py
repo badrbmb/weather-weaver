@@ -15,18 +15,12 @@ class EMCWFProcessor(BaseProcessor):
         """Load raw files."""
         return cfgrib.open_datasets(
             path=path,
-            chunks={
-                "time": 1,
-                "step": -1,
-                "longitude": "auto",
-                "latitude": "auto",
-            },
             backend_kwargs={"indexpath": ""},
         )
 
     @staticmethod
-    def merge_datasets(datasets: list[xr.Dataset]) -> xr.Dataset:
-        """Merge all datasets into a single one."""
+    def pre_process(datasets: list[xr.Dataset]) -> xr.Dataset:
+        """Pre-process dastsets."""
         # each dataset is specific to a single param
         for i, ds in enumerate(datasets):
             # Delete unwanted coordinates
@@ -34,18 +28,24 @@ class EMCWFProcessor(BaseProcessor):
                 names=[c for c in ds.coords if c not in constants.COORDINATE_ALLOW_LIST],
                 errors="ignore",
             )
+            # rename time field to make explicit this is the init time
+            ds = ds.rename({"time": "run_time"})
             # Put the modified dataset back in the list
             datasets[i] = ds
 
+        return datasets
+
+    @staticmethod
+    def merge_datasets(datasets: list[xr.Dataset]) -> xr.Dataset:
+        """Merge all datasets into a single one."""
         # merge all datasets
         merged_dataset = xr.merge(
             objects=datasets,
             compat="override",
             combine_attrs="drop_conflicts",
         )
-        # rename time field to make explicit this is the init time
-        merged_dataset = merged_dataset.rename({"time": "run_time"})
-        return merged_dataset.unify_chunks()
+        # unify chunks and return
+        return merged_dataset.chunk("auto").unify_chunks()
 
     @staticmethod
     def process(
@@ -84,6 +84,7 @@ class EMCWFProcessor(BaseProcessor):
     ) -> dask_gpd.GeoDataFrame:
         """Process raw file."""
         datasets = self.load(raw_path)
+        datasets = self.pre_process(datasets)
         dataset = self.merge_datasets(datasets)
         if geo_filter is not None:
             dataset = geo_filter.filter_dataset(dataset)
