@@ -36,6 +36,8 @@ ruff = "^0.1.9"
 rich = "^13.7.0"
 pre-commit = "^3.6.0"
 bokeh = "^3.3.2"
+pytest = "^7.4.4"
+pytest-mock = "^3.12.0"
 
 [tool.poetry.group.ecmwf.dependencies]
 ecmwf-opendata = "^0.2.0"
@@ -76,7 +78,7 @@ indent-width = 4
 ignore = [
     "D203", "D213", "D215", "D400", "D401", "D404", "D406",
     "D407", "D408", "D409", "D413", "D100", "D101", "D107",
-    "ANN101",
+    "ANN101", "S101"
 ]
 exclude = ["__init__.py"]
 fixable = ["ALL"]

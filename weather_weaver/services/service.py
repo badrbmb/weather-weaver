@@ -78,6 +78,15 @@ class WeatherConsumerService:
         # flatten and return list
         return [u for v in all_requests for u in v]
 
+    def _filter_new_requests(self, all_requests: list[BaseRequest]) -> list[BaseRequest]:
+        return [
+            t
+            for t in all_requests
+            if not self.storer.is_valid(
+                path=self.processed_dir / f"{t.file_name}.parquet",
+            )
+        ]
+
     def _download(self, request: BaseRequest) -> tuple[Path | None, BaseRequest]:
         raw_path = self.fetcher.download_raw_file(
             raw_dir=self.raw_dir,
@@ -121,11 +130,33 @@ class WeatherConsumerService:
         )
         return dask_bag
 
+    def _process_requests(
+        self,
+        all_new_requests: list[BaseRequest],
+        dask_scheduler: str | None = None,
+    ) -> list[Path]:
+        # TODO: do we need an orchestrator here instead?
+        # define the pipeline
+        pipeline = (
+            self._build_dask_pipeline(
+                all_new_requests,
+                npartitions=len(all_new_requests),
+            )
+            if len(all_new_requests) > 0
+            else None
+        )
+        # run the pipeline
+        processed_files: list[Path] = (
+            pipeline.compute(scheduler=dask_scheduler) if pipeline is not None else []
+        )
+        return processed_files
+
     def download_datasets(
         self,
         start: dt.date,
         date_offset: int,
         offset_frequency: OffsetFrequency,
+        scheduler: str | None = None,
     ) -> list[Path]:
         """Download datasets for all dates between start and end."""
         start_time = time.perf_counter()
@@ -142,13 +173,7 @@ class WeatherConsumerService:
         )
 
         # check the ones already processed
-        all_new_requests = [
-            t
-            for t in all_requests
-            if not self.storer.is_valid(
-                path=self.processed_dir / f"{t.file_name}.parquet",
-            )
-        ]
+        all_new_requests = self._filter_new_requests(all_requests)
 
         logger.debug(
             event="Built requests.",
@@ -156,17 +181,7 @@ class WeatherConsumerService:
             count_all_requests=len(all_requests),
         )
 
-        # define the pipeline
-        pipeline = (
-            self._build_dask_pipeline(
-                all_new_requests,
-                npartitions=len(all_new_requests),
-            )
-            if len(all_new_requests) > 0
-            else None
-        )
-        # run the pipeline
-        processed_files: list[Path] = pipeline.compute() if pipeline is not None else []
+        processed_files = self._process_requests(all_new_requests, dask_scheduler=scheduler)
 
         end_time = time.perf_counter()
         logger.info(
