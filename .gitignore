@@ -165,3 +165,6 @@ data/
 
 # ruff
 .ruff_cache/
+
+#notebooks
+notebooks/*.ipynb
