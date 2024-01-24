@@ -2,6 +2,7 @@ from pathlib import Path
 
 import cfgrib
 import dask_geopandas as dask_gpd
+import numpy as np
 import xarray as xr
 
 from weather_weaver.inputs.ecmwf import constants
@@ -14,12 +15,12 @@ class EMCWFProcessor(BaseProcessor):
     def load(path: Path) -> list[xr.Dataset]:
         """Load raw files."""
         return cfgrib.open_datasets(
-            path=path,
+            path=path.resolve().as_posix(),
             backend_kwargs={"indexpath": ""},
         )
 
     @staticmethod
-    def pre_process(datasets: list[xr.Dataset]) -> xr.Dataset:
+    def pre_process(datasets: list[xr.Dataset]) -> list[xr.Dataset]:
         """Pre-process dastsets."""
         # each dataset is specific to a single param
         for i, ds in enumerate(datasets):
@@ -46,6 +47,37 @@ class EMCWFProcessor(BaseProcessor):
         )
         # unify chunks and return
         return merged_dataset.chunk("auto").unify_chunks()
+
+    @staticmethod
+    def interpolate(
+        dataset: xr.Dataset,
+        target_resolution: float = constants.TARGET_RESOLUTION,
+    ) -> xr.Dataset:
+        """Resample datasets to increate spatial resolution and interpolate."""
+        # Calculate spatial resolution
+        lat_resolution = abs(dataset["latitude"].diff(dim="latitude").mean().values)
+        lon_resolution = abs(dataset["longitude"].diff(dim="longitude").mean().values)
+
+        if lat_resolution <= target_resolution and lon_resolution <= target_resolution:
+            # No need to resample here, dataset is more granular than the target
+            return dataset
+
+        scale_lat = int(lat_resolution / target_resolution)
+        scale_lon = int(lon_resolution / target_resolution)
+
+        new_lon = np.linspace(
+            dataset.longitude[0],
+            dataset.longitude[-1],
+            dataset.sizes["longitude"] * scale_lon,
+        )
+
+        new_lat = np.linspace(
+            dataset.latitude[0],
+            dataset.latitude[-1],
+            dataset.sizes["latitude"] * scale_lat,
+        )
+
+        return dataset.interp(latitude=new_lat, longitude=new_lon)
 
     @staticmethod
     def process(
@@ -81,11 +113,14 @@ class EMCWFProcessor(BaseProcessor):
         self,
         raw_path: Path,
         geo_filter: GeoFilterModel | None = None,
+        interpolate: bool = False,
     ) -> dask_gpd.GeoDataFrame:
         """Process raw file."""
         datasets = self.load(raw_path)
         datasets = self.pre_process(datasets)
         dataset = self.merge_datasets(datasets)
+        if interpolate:
+            dataset = self.interpolate(dataset)
         if geo_filter is not None:
             dataset = geo_filter.filter_dataset(dataset)
         ddf = self.process(

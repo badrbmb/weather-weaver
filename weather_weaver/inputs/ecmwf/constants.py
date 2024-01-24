@@ -27,3 +27,6 @@ PROCESSED_DIR.mkdir(exist_ok=True)
 
 # list of coordinates to keep from raw datasets
 COORDINATE_ALLOW_LIST: list[str] = ["time", "step", "latitude", "longitude"]
+
+# The target resolution when resampling datasets.
+TARGET_RESOLUTION = 0.2

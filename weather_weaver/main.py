@@ -65,12 +65,8 @@ def load_source(
     """Load fetcher, builder and processor for a given data source."""
     match source:
         case DataSource.ECMWF_OPEN_DATA:
-            from weather_weaver.inputs.ecmwf.open_data.fetcher import (
-                ECMWFOpenDataFetcher,
-            )
-            from weather_weaver.inputs.ecmwf.open_data.request import (
-                ECMWFOpenDataRequestBuilder,
-            )
+            from weather_weaver.inputs.ecmwf.open_data.fetcher import ECMWFOpenDataFetcher
+            from weather_weaver.inputs.ecmwf.open_data.request import ECMWFOpenDataRequestBuilder
             from weather_weaver.inputs.ecmwf.processor import EMCWFProcessor
 
             fetcher = ECMWFOpenDataFetcher()
@@ -168,7 +164,7 @@ def download_datasets(
 ) -> None:
     """CLI method to download datasets."""
     # parse date str
-    start = (
+    _start = (
         dt.datetime.strptime(
             start,
             DEFAULT_DATE_FORMAT,
@@ -214,9 +210,13 @@ def download_datasets(
 
     try:
         _ = service.download_datasets(
-            start=start,
+            start=_start,
             date_offset=date_offset,
             offset_frequency=offset_frequency,
+            # scheduler option: "threads", "multiprocessing" or "synchronous"
+            # to override default.
+            # more info: https://docs.dask.org/en/stable/scheduling.html
+            scheduler=None,
         )
     except Exception as e:
         raise e

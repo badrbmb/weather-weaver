@@ -101,11 +101,14 @@ class EMCWFCDSProcessor(EMCWFProcessor):
         self,
         raw_path: Path,
         geo_filter: GeoFilterModel,
+        interpolate: bool = False,
     ) -> dask_gpd.GeoDataFrame:
         """Process raw file."""
         datasets = self.load(raw_path)
         datasets = self.pre_process(datasets)
         dataset = self.merge_datasets(datasets)
+        if interpolate:
+            dataset = self.interpolate(dataset)
         ddf = self.process(
             dataset=dataset,
         )

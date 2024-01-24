@@ -32,7 +32,7 @@ class LocalClient(StorageInterface):
     def store(self, *, ddf: dask.dataframe.DataFrame, destination_path: Path) -> Path:
         """Store a dataset."""
         destination_path.parent.mkdir(parents=True, exist_ok=True)
-        ddf.to_parquet(destination_path)
+        ddf.to_parquet(destination_path, write_index=False)
         logger.debug(
             event="Stored DataFrame",
             destination_path=destination_path,
